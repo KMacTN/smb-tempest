@@ -2,10 +2,24 @@
 
 SMB Session Generator (smbgen) is a Python-based tool designed to create multiple concurrent SMB sessions to a specified share, perform parallel file reads, and aggregate performance metrics. It features a live-updating GUI that displays real-time summaries and logs, and supports exporting results as JSON.
 
-|  |  |
-| --- | --- |
-| ![Microsoft Windows Icon](images/windows-icon.png) | **Built specifically to run on Microsoft Windows**, smbgen creates native SMB sessions. |
-| ![Git for Windows Icon](images/git_logo.png)          | For the best experience, use Git Bash. Download it from: [Git for Windows](https://gitforwindows.org/). |
+<table style="border-collapse: collapse;">
+  <tr>
+    <td style="border: none; padding: 5px;">
+      <img src="images/windows-icon.png" alt="Microsoft Windows Icon">
+    </td>
+    <td style="border: none; padding: 5px;">
+      <strong>Built specifically to run on Microsoft Windows</strong>, smbgen creates native SMB sessions.
+    </td>
+  </tr>
+  <tr>
+    <td style="border: none; padding: 5px;">
+      <img src="images/git_logo.png" alt="Git for Windows Icon">
+    </td>
+    <td style="border: none; padding: 5px;">
+      For the best experience, use Git Bash. Download it from: <a href="https://gitforwindows.org/">Git for Windows</a>.
+    </td>
+  </tr>
+</table>
 
 ## Features
 
