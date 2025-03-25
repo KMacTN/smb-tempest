@@ -110,7 +110,6 @@ python smb_session_generator.py --debug [other options...]
 
 ## License
 
-### Copyright (c) 2025
 ### MIT License - See LICENSE file for details.
 
 ## Contributing
