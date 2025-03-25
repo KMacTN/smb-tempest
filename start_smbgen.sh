@@ -23,16 +23,16 @@
 #
 #===============================================================================
 
-set -e 
-set -u 
+set -e
+set -u
 
-VENV_PATH="$HOME/Documents/MYENV/Scripts/activate"
+VENV_PATH="$HOME/Documents/venv/Scripts/activate"
 PYTHON_SCRIPT="/q/smbgen.py"
 
 USERNAME="admin"
-PASSWORD="Admin123!"
-SERVER_IP="10.220.150.70"
-SHARE_NAME="Test"
+PASSWORD="YOUR_PASSWORD_HERE"
+SERVER_IP="SMB_SERVER_IP_ADDRESS"
+SHARE_NAME="YOUR_SHARENAME"
 NUM_ACTIVE_FILES=1
 NUM_INACTIVE_SESSIONS=0
 
