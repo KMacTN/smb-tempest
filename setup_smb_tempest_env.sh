@@ -1,9 +1,9 @@
 #!/bin/bash
 ################################################################################
 # Script: setup_smb_tempest_env.sh
-# Purpose: Interactive, safe setup for smb_tempest.py Python environment
+# Purpose: Interactive, safe setup for smb_tempest.py and tempest_coordinator.py
 # Author: KMac and Sheila
-# Date: April 28th, 2025
+# Date: April 30th, 2025
 ################################################################################
 
 set -e
@@ -28,7 +28,6 @@ confirm_and_run() {
 
 echo "Checking Python 3 installation..."
 
-# Check if python3 is installed
 if ! command -v python3 >/dev/null 2>&1; then
     echo "Python3 is not installed."
     if [[ "$(uname)" == "Darwin" ]]; then
@@ -41,34 +40,24 @@ if ! command -v python3 >/dev/null 2>&1; then
     fi
 fi
 
-# Correct Python version checking
+# Check Python version
 PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
 PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
 
-REQUIRED_MAJOR=3
-REQUIRED_MINOR=10
-
-if (( PYTHON_MAJOR > REQUIRED_MAJOR )) || \
-   (( PYTHON_MAJOR == REQUIRED_MAJOR && PYTHON_MINOR >= REQUIRED_MINOR )); then
+if (( PYTHON_MAJOR > 3 )) || (( PYTHON_MAJOR == 3 && PYTHON_MINOR >= 10 )); then
     echo "Python version ${PYTHON_MAJOR}.${PYTHON_MINOR} is OK."
 else
     echo "Python version ${PYTHON_MAJOR}.${PYTHON_MINOR} is too old. Please upgrade Python 3 manually."
     exit 1
 fi
 
-# Function to create virtual environment safely
+# Create venv
 create_virtualenv() {
     if ! python3 -m venv "$VENV_DIR"; then
         echo "Virtual environment creation failed. Checking for missing venv module..."
-
         PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         VENV_PACKAGE="python${PYTHON_VERSION}-venv"
-
-        echo "Looks like you may be missing $VENV_PACKAGE."
-
         confirm_and_run "Would you like me to install $VENV_PACKAGE now?" "sudo apt update -y && sudo apt install -y $VENV_PACKAGE"
-
-        echo "Retrying virtual environment creation..."
         python3 -m venv "$VENV_DIR"
     fi
 }
@@ -96,13 +85,23 @@ source "$VENV_DIR/bin/activate"
 echo "Upgrading pip..."
 pip install --upgrade pip
 
-# Check if smbprotocol is installed
-if ! python -c "import smbprotocol" >/dev/null 2>&1; then
-    echo "smbprotocol module not found."
-    confirm_and_run "Would you like me to install smbprotocol inside the virtual environment?" "pip install smbprotocol"
-else
-    echo "smbprotocol module already installed."
-fi
+# Required modules
+REQUIRED_MODULES=(
+    smbprotocol
+    requests
+    paramiko
+    qumulo_api
+)
+
+echo "Installing required Python modules..."
+for module in "${REQUIRED_MODULES[@]}"; do
+    if ! python -c "import $module" >/dev/null 2>&1; then
+        echo "Installing $module..."
+        pip install "$module"
+    else
+        echo "$module already installed."
+    fi
+done
 
 echo "Freezing environment to requirements.txt..."
 pip freeze > requirements.txt
