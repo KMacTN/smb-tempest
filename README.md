@@ -1,143 +1,116 @@
-# SMB Session Generator (smbgen)
+# SMB Tempest
 
-SMB Session Generator (smbgen) is a Python-based tool designed to create multiple concurrent SMB sessions to a specified share, perform parallel file reads, and aggregate performance metrics. It features a live-updating GUI that displays real-time summaries and logs, and supports exporting results as JSON.
-
-<table border="0" cellspacing="0" cellpadding="5" style="border-collapse: collapse; border: 0 !important;">
-  <tr>
-    <td style="border: 0 !important; padding: 5px;">
-      <img src="images/windows-icon.png" alt="Microsoft Windows Icon">
-    </td>
-    <td style="border: 0 !important; padding: 5px;">
-      <strong>Built specifically to run on Microsoft Windows</strong>, smbgen creates native SMB sessions.
-    </td>
-  </tr>
-  <tr>
-    <td style="border: 0 !important; padding: 5px;">
-      <img src="images/git_logo.png" alt="Git for Windows Icon">
-    </td>
-    <td style="border: 0 !important; padding: 5px;">
-      For the best experience, use Git Bash. Download it from: <a href="https://gitforwindows.org/">Git for Windows</a>.
-    </td>
-  </tr>
-</table>
-
-## Features
-
-- **Concurrent SMB Sessions:** Establish multiple SMB sessions simultaneously.
-- **Parallel File Reading:** Read files in parallel to simulate load.
-- **Performance Metrics:** Track successful/failed sessions, total data read, throughput, and runtime.
-- **Live GUI Summary:** Monitor job details and session metrics in real time.
-- **Results Export:** Save aggregated results and logs to a JSON file.
-- **File Initialization:** Automatically create test files (125 MiB each) on the target share.
-- **OS Tuning Recommendations:** Provides tips for Windows Server 2019 to optimize outbound TCP connections.
-
-## Requirements
-
-- **Python:** 3.x
-- **Python Modules:**
-    - `argparse`
-    - `concurrent.futures`
-    - `datetime`
-    - `json`
-    - `logging`
-    - `os`
-    - `threading`
-    - `time`
-    - `uuid`
-    - `humanize`
-    - `asyncio`
-    - `tkinter`
-    - `Pillow` (PIL)
-    - `colorama`
-    - `smbprotocol`
-
-## Installation
-
-1.  **Clone the Repository:**
-
-    ```bash
-    git clone [https://github.com/KMacTN/smbgen.git](https://github.com/KMacTN/smbgen.git)
-    cd smbgen
-    ```
-
-2.  **Set Up a Virtual Environment (Optional but Recommended):**
-
-    ```bash
-    python -m venv venv
-    # On Windows:
-    venv\Scripts\activate
-    # On macOS/Linux:
-    source venv/bin/activate
-    ```
-
-3.  **Install Dependencies:**
-
-    `pip install -r requirements.txt`
-
-    Otherwise, install the necessary modules individually:
-    `pip install humanize Pillow colorama smbprotocol`
-
-## Usage
-
-### Running the Application
-
-You can start the application via the command-line with various options:
-
-```bash
-python smb_session_generator.py --server_ip <SERVER_IP> --share_name <SHARE_NAME> --num_active_files <NUM_ACTIVE_FILES> --num_inactive_sessions <NUM_INACTIVE_SESSIONS> --username <USERNAME> --password <PASSWORD>
-```
-
-For example:
-
-```bash
-python smb_session_generator.py --server_ip 192.168.1.100 --share_name Test --num_active_files 10 --num_inactive_sessions 5 --username user --password pass
-```
-
-### GUI Operation
-
-When run without or with partial command-line arguments, the application opens a GUI that allows you to:
-
--   **Input Connection Details:** Enter the Server IP, Share Name, Username, Password, number of Active Files, and Inactive Sessions.
--   **Start/Stop Operations:** Use the Start button to begin the session generation and file reading tasks. The button toggles to a Stop button to halt operations.
--   **Initialize Files:** Create test files on the target SMB share (each file is 125 MiB) using the “Initialize Files” button.
--   **Export Results:** Save the aggregated performance metrics and logs as a JSON file.
-
-![Example of smbgen GUI after job completion](images/smbgen-examplegui.png)
-
-### OS Tuning Recommendations (Windows Server 2019)
-
-For best performance with many concurrent outbound TCP connections, consider these tuning adjustments:
-
--   **Increase Ephemeral Port Range:**
-    Set `MaxUserPort` (e.g., to 65534) in:
-    `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
--   **Reduce TcpTimedWaitDelay:**
-    Change this value to 30 seconds (default is often 240 seconds) in the same registry key.
--   **Adjust Desktop Heap Allocation:**
-    If the GUI desktop heap becomes a bottleneck, increase its allocation in:
-    `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\SubSystems\Windows`
-
-### Debug Logging
-
-Warning: The SMB protocol library can produce **extensive debug** output.  By default, the SMB logger is set to WARNING level to reduce noise.  To enable detailed debug logs, run the script with the `--debug` flag:
-
-```bash
-python smb_session_generator.py --debug [other options...]
-```
-
-## License
-
-### MIT License - See LICENSE file for details.
-
-## Contributing
-
-Contributions, bug reports, and feature requests are welcome.  Please open an issue or submit a pull request on GitHub.
-
-## Contact
-
-Created by Kevin McDonald (KMac) & Sheila (Conglomeration of AI Assistants).
-For questions or suggestions, please open an issue on GitHub.
+Multi-threaded SMB Session Generator and Load Tester for Qumulo.
 
 ---
 
-**Disclaimer:** Ensure you have the proper permissions and network access before running SMB operations. Follow any prerequisite security guidelines (e.g., disabling local firewall or antivirus) as indicated by the application prompts.
+## Quick Start
+
+```bash
+bash setup_smb_tempest_env.sh
+source smb_tempest_env/bin/activate
+python smb_tempest.py --server_ip <IP> --share_name <share> --username <user> --password <pass>
+```
+
+---
+
+## Overview
+
+SMB Tempest is a Python-based tool designed to generate load against SMB shares by creating concurrent sessions, writing large files, reading them, and generating random file churn. It tracks throughput and performance metrics to assist in storage performance evaluation.
+
+![SMB Tempest Architecture](images/smb_tempest_architecture.png)
+
+---
+
+## Tools Included
+
+| Tool                      | Purpose                                          |
+|----------------------------|--------------------------------------------------|
+| `smb_tempest.py`           | Multi-threaded SMB session load generator        |
+| `smb_session_monitor.py`   | Real-time active/inactive SMB session tracker    |
+| `setup_smb_tempest_env.sh` | Safe, interactive Python environment bootstrap  |
+
+---
+
+## Setup Environment
+
+Use the included helper script for quick and safe environment setup:
+
+```bash
+bash setup_smb_tempest_env.sh
+```
+
+This script will:
+
+- Verify Python 3.10+
+- Create and configure `smb_tempest_env` virtual environment
+- Install required modules (`smbprotocol`)
+- Output a `requirements.txt`
+
+To activate your environment after setup:
+
+```bash
+source smb_tempest_env/bin/activate
+```
+
+---
+
+## Running SMB Tempest
+
+Example command:
+
+```bash
+python smb_tempest.py --server_ip 10.1.62.40 --share_name tempest --username admin --password Admin123! --num_tasks 100 --max_file_size 128
+```
+
+Options:
+
+- `--server_ip` (Required)
+- `--share_name` (Required)
+- `--username` (Required)
+- `--password` (Required)
+- `--num_tasks` (default: 1)
+- `--max_file_size` (default: 1024 MiB)
+
+---
+
+## Companion Tool: `smb_session_monitor.py`
+
+`smb_session_monitor.py` complements `smb_tempest.py` by monitoring SMB session states during and after tests.
+
+Example usage:
+
+```bash
+python smb_session_monitor.py --ip 10.1.62.40 --username admin --password Admin123! --threshold 60 --interval 5
+```
+
+---
+
+## Example Results
+
+```plaintext
+================== Test Summary ==================
+Total Tasks Executed       : 100
+Total Random Files Created : 6400
+Total Bytes Read           : 12800000000 bytes (12207.03 MB)
+Total Time Taken           : 25.82 seconds
+Overall Throughput         : 472.69 MB/s
+==================================================
+```
+
+---
+
+## License
+
+MIT License — See LICENSE file for details.
+
+---
+
+## Contact
+
+Created by Kevin McDonald (KMac) & Sheila.
+Questions or suggestions? Open an issue on GitHub.
+
+---
+
+**Disclaimer:** Ensure you have the proper permissions before running SMB load tests. Always follow organizational policies and security best practices.

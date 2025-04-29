@@ -418,7 +418,7 @@ async def create_sessions_with_delay(server_ip, share_name, username, password, 
             for conn, session, idx in new_sessions:
                 filename = f"smbgen-files/smb_snortfest.{idx}"
                 executor.submit(process_file_read, conn, session, share_name, filename, results)
-        await asyncio.sleep(0.5)
+        # await asyncio.sleep(0.5)
     debug_print(f"All {session_count} SMB sessions processed (successful: {len(sessions)}, failed: {failed_session_creations}).")
     return sessions
 
