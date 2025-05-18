@@ -1,0 +1,9 @@
+{
+  "smb_server_address": "10.1.62.40",
+  "share_name": "tempest",
+  "username": "admin",
+  "password": "Admin123!",
+  "hero_read_iops": true,
+  "num_smb_sessions": 125,
+  "fail_fast": true
+}
