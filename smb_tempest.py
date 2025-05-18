@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 Name:   smb_tempest.py
 Author: KMac and Sheila
@@ -16,42 +15,28 @@ many small random files, and measures performance throughout.
 
 Supported Modes:
 ----------------
---hero_streaming_reads
+--mode_streaming_reads
   • Reads an existing file from start to finish using large block sizes (default 1MB).
   • Simulates streaming, backups, or ML dataset reading.
   • File must already exist.
 
---hero_read_iops
+--mode_read_iops
   • Performs many tiny reads (4KB each) from the beginning of an existing file.
   • Simulates high-I/O workloads like databases or metadata scanning.
   • File must already exist. Default is 1024 reads.
 
---hero_streaming_writes
+--mode_streaming_writes
   • Writes a brand new file using large blocks (default 1MB) until a size limit is reached.
   • Simulates high-throughput sequential writes.
 
---max_random_io
+--mode_random_io
   • Performs a mix of random reads and writes on an existing file.
   • Simulates unpredictable I/O like virtual machines or shared user access.
-  • File must already exist. Default is 100 random operations.
+  • File must already exist. Requires --max_random_io_readpct to control read ratio.
 
 You may also pass configuration using a JSON file with --config_file.
 If not specified, smb_tempest_cfg.json is used by default if found,
 with a prompt for confirmation before loading.
-
-Example Usage:
---------------
-python smb_tempest.py \
-    --smb_server_address 10.1.62.40 \
-    --share_name tempest \
-    --username admin \
-    --password Admin123! \
-    --num_smb_sessions 100 \
-    --hero_streaming_reads
-
-or
-
-python smb_tempest.py --config_file smb_tempest_cfg.json
 """
 
 import argparse
@@ -136,43 +121,26 @@ def get_client_uuid():
         f.write(new_uuid)
     return new_uuid
 
-def load_config(config_path):
-    with open(config_path, 'r') as f:
-        data = json.load(f)
-    return argparse.Namespace(**data)
-
-def merge_args_with_config(args):
-    config_path = args.config_file or DEFAULT_CONFIG_FILE
-    if os.path.exists(config_path):
-        if not args.config_file:
-            confirm = input(f"Default config file '{config_path}' found. Load it? (y/N): ").strip().lower()
-            if confirm != "y":
-                return args
-        config_args = load_config(config_path)
-        for key, value in vars(config_args).items():
-            cli_value = getattr(args, key, None)
-            if isinstance(cli_value, bool):
-                if cli_value is False:
-                    setattr(args, key, value)
-            elif cli_value == parser.get_default(key):
-                setattr(args, key, value)
-
-        # Type coercion
-        for int_field in ["num_smb_sessions", "max_file_size", "block_size", "num_iops_reads", "num_random_ops"]:
-            try:
-                val = getattr(args, int_field, None)
-                if isinstance(val, str):
-                    setattr(args, int_field, int(val))
-            except Exception:
-                pass
-    return args
+def human_readable_bytes(num_bytes):
+    if num_bytes >= 1024**3:
+        return f"{num_bytes / 1024**3:.2f} GB"
+    elif num_bytes >= 1024**2:
+        return f"{num_bytes / 1024**2:.2f} MB"
+    elif num_bytes >= 1024:
+        return f"{num_bytes / 1024:.2f} KB"
+    else:
+        return f"{num_bytes} B"
 
 def infer_mode_label(args):
-    if args.hero_streaming_reads: return "hero_streaming_reads"
-    if args.hero_read_iops: return "hero_read_iops"
-    if args.hero_streaming_writes: return "hero_streaming_writes"
-    if args.max_random_io: return "max_random_io"
-    return "default"
+    if args.mode_streaming_reads:
+        return "streaming_reads"
+    if args.mode_read_iops:
+        return "read_iops"
+    if args.mode_streaming_writes:
+        return "streaming_writes"
+    if args.mode_random_io:
+        return "random_io"
+    return "default (write stream → read stream → churn small random files)"
 
 def print_config_summary(args, client_uuid):
     readable_block = human_readable_bytes(args.block_size)
@@ -189,111 +157,35 @@ Client UUID Directory : {client_uuid}
 ====================================================================
 """)
 
-@retry_operation(max_attempts=5, delay_seconds=2)
-def smb_create_file(tree, remote_file_path, size, block_size):
-    file = Open(tree, remote_file_path)
-    file.create(
-        impersonation_level=ImpersonationLevel.Impersonation,
-        desired_access=FilePipePrinterAccessMask.GENERIC_READ | FilePipePrinterAccessMask.GENERIC_WRITE,
-        file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
-        share_access=ShareAccess.FILE_SHARE_READ | ShareAccess.FILE_SHARE_WRITE,
-        create_disposition=CreateDisposition.FILE_OVERWRITE_IF,
-        create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
-    )
-    total_written = 0
-    buffer = os.urandom(block_size)
-    while total_written < size:
-        to_write = min(block_size, size - total_written)
-        file.write(buffer[:to_write], total_written)
-        total_written += to_write
-    file.flush()
-    file.close()
-    time.sleep(1)
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        data = json.load(f)
+    return argparse.Namespace(**data)
 
-@retry_operation(max_attempts=5, delay_seconds=2)
-def smb_read_file(session, server_ip, share_name, remote_file_path, block_size):
-    time.sleep(1)
-    tree = TreeConnect(session, f"\\\\{server_ip}\\{share_name}")
-    tree.connect()
-    file = Open(tree, remote_file_path)
-    file.create(
-        impersonation_level=ImpersonationLevel.Impersonation,
-        desired_access=FilePipePrinterAccessMask.GENERIC_READ,
-        file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
-        share_access=ShareAccess.FILE_SHARE_READ,
-        create_disposition=CreateDisposition.FILE_OPEN,
-        create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
-    )
-    total_bytes = 0
-    offset = 0
-    try:
-        while True:
-            data = file.read(offset, block_size)
-            if not data:
-                break
-            total_bytes += len(data)
-            offset += len(data)
-    finally:
-        file.close()
-        tree.disconnect()
-    return total_bytes
+def merge_args_with_config(args):
+    config_path = args.config_file or DEFAULT_CONFIG_FILE
+    if os.path.exists(config_path):
+        if not args.config_file:
+            confirm = input(f"Default config file '{config_path}' found. Load it? (y/N): ").strip().lower()
+            if confirm in ("n", "no"):
+                return args
+        config_args = load_config(config_path)
+        for key, value in vars(config_args).items():
+            cli_value = getattr(args, key, None)
+            if isinstance(cli_value, bool):
+                if cli_value is False:
+                    setattr(args, key, value)
+            elif cli_value == parser.get_default(key):
+                setattr(args, key, value)
 
-@retry_operation(max_attempts=5, delay_seconds=2)
-def smb_iops_read(session, server_ip, share_name, remote_file_path, num_reads=1024):
-    tree = TreeConnect(session, f"\\\\{server_ip}\\{share_name}")
-    tree.connect()
-    file = Open(tree, remote_file_path)
-    file.create(
-        impersonation_level=ImpersonationLevel.Impersonation,
-        desired_access=FilePipePrinterAccessMask.GENERIC_READ,
-        file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
-        share_access=ShareAccess.FILE_SHARE_READ,
-        create_disposition=CreateDisposition.FILE_OPEN,
-        create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
-    )
-    total_bytes = 0
-    block_size = 4096
-    for i in range(num_reads):
-        try:
-            data = file.read(i * block_size, block_size)
-            if not data:
-                break
-            total_bytes += len(data)
-        except Exception:
-            continue
-    file.close()
-    tree.disconnect()
-    return total_bytes
-
-@retry_operation(max_attempts=5, delay_seconds=2)
-def smb_random_io(session, server_ip, share_name, remote_file_path, file_size, block_size, num_ops=100):
-    tree = TreeConnect(session, f"\\\\{server_ip}\\{share_name}")
-    tree.connect()
-    file = Open(tree, remote_file_path)
-    file.create(
-        impersonation_level=ImpersonationLevel.Impersonation,
-        desired_access=FilePipePrinterAccessMask.GENERIC_READ | FilePipePrinterAccessMask.GENERIC_WRITE,
-        file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
-        share_access=ShareAccess.FILE_SHARE_READ | ShareAccess.FILE_SHARE_WRITE,
-        create_disposition=CreateDisposition.FILE_OPEN,
-        create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
-    )
-    total_bytes = 0
-    for _ in range(num_ops):
-        offset = random.randint(0, max(0, file_size - block_size))
-        if random.random() < 0.5:
+        for int_field in ["num_smb_sessions", "max_file_size", "block_size", "num_iops_reads", "num_random_ops", "max_random_io_readpct"]:
             try:
-                data = file.read(offset, block_size)
-                total_bytes += len(data)
+                val = getattr(args, int_field, None)
+                if isinstance(val, str):
+                    setattr(args, int_field, int(val))
             except Exception:
-                continue
-        else:
-            file.write(os.urandom(block_size), offset)
-            total_bytes += block_size
-    file.flush()
-    file.close()
-    tree.disconnect()
-    return total_bytes
+                pass
+    return args
 
 @retry_operation(max_attempts=5, delay_seconds=2)
 def smb_create_random_file(tree, remote_file_path):
@@ -359,25 +251,26 @@ def process_task(task_id, args, client_uuid):
         remote_file_path = f"{client_dir}\\smb_tempest.{task_id}"
         stats = {"mode": infer_mode_label(args)}
 
-        if args.hero_streaming_reads:
+        if args.mode_streaming_reads:
+            args.block_size = 4 * 1024 * 1024
             stats["bytes_read"] = smb_read_file(session, server_ip, share_name, remote_file_path, args.block_size)
             stats["num_random_files"] = 0
 
-        elif args.hero_read_iops:
-            stats["bytes_read"] = smb_iops_read(session, server_ip, share_name, remote_file_path,
-                                                args.num_iops_reads)
+        elif args.mode_read_iops:
+            stats["bytes_read"] = smb_iops_read(session, server_ip, share_name, remote_file_path, args.num_iops_reads)
             stats["num_random_files"] = 0
 
-        elif args.hero_streaming_writes:
+        elif args.mode_streaming_writes:
             smb_create_file(tree, remote_file_path, args.max_file_size * 1024**2, args.block_size)
             stats["bytes_read"] = 0
             stats["num_random_files"] = 0
 
-        elif args.max_random_io:
+        elif args.mode_random_io:
             stats["bytes_read"] = smb_random_io(session, server_ip, share_name, remote_file_path,
                                                 args.max_file_size * 1024**2,
                                                 args.block_size,
-                                                num_ops=args.num_random_ops)
+                                                num_ops=args.num_random_ops,
+                                                read_pct=args.max_random_io_readpct)
             stats["num_random_files"] = 0
 
         else:
@@ -402,15 +295,94 @@ def process_task(task_id, args, client_uuid):
         traceback.print_exc()
         return {}
 
-def human_readable_bytes(num_bytes):
-    if num_bytes >= 1024**3:
-        return f"{num_bytes / 1024**3:.2f} GB"
-    elif num_bytes >= 1024**2:
-        return f"{num_bytes / 1024**2:.2f} MB"
-    elif num_bytes >= 1024:
-        return f"{num_bytes / 1024:.2f} KB"
-    else:
-        return f"{num_bytes} B"
+@retry_operation(max_attempts=5, delay_seconds=2)
+def smb_create_file(tree, remote_file_path, size, block_size):
+    file = Open(tree, remote_file_path)
+    file.create(
+        impersonation_level=ImpersonationLevel.Impersonation,
+        desired_access=FilePipePrinterAccessMask.GENERIC_READ | FilePipePrinterAccessMask.GENERIC_WRITE,
+        file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
+        share_access=ShareAccess.FILE_SHARE_READ | ShareAccess.FILE_SHARE_WRITE,
+        create_disposition=CreateDisposition.FILE_OVERWRITE_IF,
+        create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
+    )
+    total_written = 0
+    buffer = os.urandom(block_size)
+    while total_written < size:
+        to_write = min(block_size, size - total_written)
+        file.write(buffer[:to_write], total_written)
+        total_written += to_write
+    file.flush()
+    file.close()
+    time.sleep(1)
+
+@retry_operation(max_attempts=5, delay_seconds=2)
+def smb_random_io(session, server_ip, share_name, remote_file_path, file_size, block_size, num_ops=100, read_pct=50):
+    tree = TreeConnect(session, f"\\\\{server_ip}\\{share_name}")
+    tree.connect()
+    file = Open(tree, remote_file_path)
+    file.create(
+        impersonation_level=ImpersonationLevel.Impersonation,
+        desired_access=FilePipePrinterAccessMask.GENERIC_READ | FilePipePrinterAccessMask.GENERIC_WRITE,
+        file_attributes=FileAttributes.FILE_ATTRIBUTE_NORMAL,
+        share_access=ShareAccess.FILE_SHARE_READ | ShareAccess.FILE_SHARE_WRITE,
+        create_disposition=CreateDisposition.FILE_OPEN,
+        create_options=CreateOptions.FILE_NON_DIRECTORY_FILE,
+    )
+    total_bytes = 0
+    read_ratio = read_pct / 100.0
+    for _ in range(num_ops):
+        offset = random.randint(0, max(0, file_size - block_size))
+        if random.random() < read_ratio:
+            try:
+                data = file.read(offset, block_size)
+                total_bytes += len(data)
+            except Exception:
+                continue
+        else:
+            file.write(os.urandom(block_size), offset)
+            total_bytes += block_size
+    file.flush()
+    file.close()
+    tree.disconnect()
+    return total_bytes
+
+@retry_operation(max_attempts=5, delay_seconds=2)
+def smb_read_file(session, server_ip, share_name, remote_file_path, block_size):
+    MAX_SMB_READ_SIZE = 1024 * 1024  # 1 MiB max safety
+    block_size = min(block_size, MAX_SMB_READ_SIZE)
+
+    tree = TreeConnect(session, f"\\\\{server_ip}\\{share_name}")
+    tree.connect()
+    file = Open(tree, remote_file_path)
+    file.create(
+        impersonation_level=1,  # ImpersonationLevel.Impersonation
+        desired_access=0x120089,  # GENERIC_READ
+        file_attributes=0x80,  # NORMAL
+        share_access=1,  # FILE_SHARE_READ
+        create_disposition=1,  # FILE_OPEN
+        create_options=0x40  # NON_DIRECTORY_FILE
+    )
+
+    file_size = file.end_of_file
+
+    def read_chunk(offset):
+        try:
+            return len(file.read(offset, block_size))
+        except Exception:
+            return 0
+
+    total_bytes = 0
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            offsets = range(0, file_size, block_size)
+            futures = [executor.submit(read_chunk, offset) for offset in offsets]
+            for future in concurrent.futures.as_completed(futures):
+                total_bytes += future.result()
+    finally:
+        file.close()
+        tree.disconnect()
+    return total_bytes
 
 def print_summary(task_stats_list, elapsed_time):
     total_tasks = len(task_stats_list)
@@ -434,8 +406,8 @@ Max IOPS Achieved          : {max_iops:,} IOPS
 ==================================================
 """)
     if total_bytes == 0:
-        print("⚠️ Warning: No bytes read! Check server visibility or permissions.")
-    print("✅ SMB Tempest complete.")
+        print("Warning: Nothing read! Check network availability, permissions, environmentals...")
+    print("SMB Tempest complete.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SMB Session Generator (Tempest Edition)",
@@ -450,16 +422,19 @@ if __name__ == "__main__":
     parser.add_argument("--block_size", type=int, default=1024*1024)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--fail_fast", action="store_true")
-    parser.add_argument("--num_iops_reads", type=int, default=1024, help="Number of 4KB reads to perform in IOPS mode")
-    parser.add_argument("--num_random_ops", type=int, default=100, help="Number of random I/O operations to perform")    
-
-    mode_group.add_argument("--hero_streaming_reads", action="store_true")
-    mode_group.add_argument("--hero_read_iops", action="store_true")
-    mode_group.add_argument("--hero_streaming_writes", action="store_true")
-    mode_group.add_argument("--max_random_io", action="store_true")
+    parser.add_argument("--num_iops_reads", type=int, default=1024)
+    parser.add_argument("--num_random_ops", type=int, default=100)
+    parser.add_argument("--max_random_io_readpct", type=int, help="Required read percentage for mode_random_io")
+    mode_group.add_argument("--mode_streaming_reads", action="store_true")
+    mode_group.add_argument("--mode_read_iops", action="store_true")
+    mode_group.add_argument("--mode_streaming_writes", action="store_true")
+    mode_group.add_argument("--mode_random_io", action="store_true")
     parser.add_argument("--config_file")
     args = parser.parse_args()
     args = merge_args_with_config(args)
+
+    if args.mode_random_io and args.max_random_io_readpct is None:
+        parser.error("--max_random_io_readpct is required when --mode_random_io is used")
 
     setup_logging(debug=args.debug)
     client_uuid = get_client_uuid()

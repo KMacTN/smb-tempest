@@ -1,116 +1,123 @@
 # SMB Tempest
 
-Multi-threaded SMB Session Generator and Load Tester for Qumulo.
-
----
-
-## Quick Start
-
-```bash
-bash setup_smb_tempest_env.sh
-source smb_tempest_env/bin/activate
-python smb_tempest.py --server_ip <IP> --share_name <share> --username <user> --password <pass>
-```
-
----
+**Author:** KMac and Sheila  
+**Updated:** May 18, 2025
 
 ## Overview
 
-SMB Tempest is a Python-based tool designed to generate load against SMB shares by creating concurrent sessions, writing large files, reading them, and generating random file churn. It tracks throughput and performance metrics to assist in storage performance evaluation.
+`SMB Tempest` is a multi-threaded SMB session generator and load tester.
 
-![SMB Tempest Architecture](images/smb_tempest_architecture.png)
+It connects to an SMB share, creates client-specific directories, writes large files, performs sequential reads, churns random files, and measures performance — all concurrently across many simulated sessions.
 
----
+## Key Features
 
-## Tools Included
+- Multi-threaded SMB I/O stress testing
+- Configurable block size, file size, session count, and I/O mix
+- Rich operational modes (sequential, IOPS, streaming, and mixed)
+- JSON-based config file with CLI override
+- ASCII-friendly summary with throughput and IOPS
+- Designed for scale testing SMB clusters and NAS environments
 
-| Tool                      | Purpose                                          |
-|----------------------------|--------------------------------------------------|
-| `smb_tempest.py`           | Multi-threaded SMB session load generator        |
-| `smb_session_monitor.py`   | Real-time active/inactive SMB session tracker    |
-| `setup_smb_tempest_env.sh` | Safe, interactive Python environment bootstrap  |
+## Supported Modes
 
----
+| Mode                  | Description                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| `--mode_streaming_reads`  | Read an existing file sequentially using large blocks (default 1MB)         |
+| `--mode_read_iops`        | Perform many 4KB reads from offset 0 (default: 1024 reads)                  |
+| `--mode_streaming_writes` | Write a large file using large blocks (default 1MB)                         |
+| `--mode_random_io`        | Mix of random reads and writes on an existing file, guided by read percentage |
 
-## Setup Environment
+If **no mode is specified**, the tool defaults to:
 
-Use the included helper script for quick and safe environment setup:
+> `default (write stream → read stream → churn small random files)`
 
-```bash
-bash setup_smb_tempest_env.sh
+This mode creates a file, reads it, then rapidly creates and deletes thousands of small files.
+
+## Configuration
+
+You can use a config file (`smb_tempest_cfg.json`) instead of CLI options. If the file exists and no `--config_file` is specified, you'll be prompted to use it.
+
+### Sample Config File
+
+```json
+{
+  "smb_server_address": "10.1.62.40",
+  "share_name": "tempest",
+  "username": "admin",
+  "password": "Admin123!",
+  "num_smb_sessions": 100,
+  "max_file_size": 512,
+  "block_size": 1048576,
+  "mode_read_iops": true,
+  "num_iops_reads": 2048,
+  "fail_fast": true
+}
 ```
 
-This script will:
+For `--mode_random_io`, you must also include:
 
-- Verify Python 3.10+
-- Create and configure `smb_tempest_env` virtual environment
-- Install required modules (`smbprotocol`)
-- Output a `requirements.txt`
-
-To activate your environment after setup:
-
-```bash
-source smb_tempest_env/bin/activate
+```json
+"max_random_io_readpct": 70
 ```
 
----
-
-## Running SMB Tempest
-
-Example command:
+## CLI Usage
 
 ```bash
-python smb_tempest.py --server_ip 10.1.62.40 --share_name tempest --username admin --password Admin123! --num_tasks 100 --max_file_size 128
+# Run with explicit CLI args
+python smb_tempest.py \
+  --smb_server_address 10.1.62.40 \
+  --share_name tempest \
+  --username admin \
+  --password Admin123! \
+  --num_smb_sessions 125 \
+  --mode_streaming_reads
+
+# OR run using config file (if prompted)
+python smb_tempest.py
 ```
 
-Options:
+## Output Example
 
-- `--server_ip` (Required)
-- `--share_name` (Required)
-- `--username` (Required)
-- `--password` (Required)
-- `--num_tasks` (default: 1)
-- `--max_file_size` (default: 1024 MiB)
-
----
-
-## Companion Tool: `smb_session_monitor.py`
-
-`smb_session_monitor.py` complements `smb_tempest.py` by monitoring SMB session states during and after tests.
-
-Example usage:
-
-```bash
-python smb_session_monitor.py --ip 10.1.62.40 --username admin --password Admin123! --threshold 60 --interval 5
 ```
+==================== SMB Tempest Configuration ====================
+Target SMB Server     : 10.0.2.173
+Share Name            : smb-sessions
+Username              : admin
+Block Size            : 1.00 MB
+Max File Size         : 1024 MiB
+Number of Sessions    : 125
+Mode                  : default (write stream → read stream → churn small random files)
+Client UUID Directory : 4cfef4f8-2e23-4cba-8858-846e9fa8995c
+====================================================================
 
----
+Starting test...
 
-## Example Results
+....................................................................
 
-```plaintext
 ================== Test Summary ==================
-Total Tasks Executed       : 100
-Total Random Files Created : 6400
-Total Bytes Read           : 12800000000 bytes (12207.03 MB)
-Total Time Taken           : 25.82 seconds
-Overall Throughput         : 472.69 MB/s
+Test Mode(s) Used          : streaming_reads
+Total Tasks Executed       : 125
+Total Random Files Created : 0
+Total Read/IO Volume       : 7.81 GB
+Total Time Taken           : 18.20 seconds
+Max Throughput Achieved    : 429.00 MB/s
+Max IOPS Achieved          : 109,824 IOPS
 ==================================================
+✅ SMB Tempest complete.
 ```
 
----
+## Requirements
+
+- Python 3.8+
+- `smbprotocol` library
+- Network access to the SMB server
+
+Install dependencies:
+
+```bash
+pip install smbprotocol
+```
 
 ## License
 
-MIT License — See LICENSE file for details.
-
----
-
-## Contact
-
-Created by Kevin McDonald (KMac) & Sheila.
-Questions or suggestions? Open an issue on GitHub.
-
----
-
-**Disclaimer:** Ensure you have the proper permissions before running SMB load tests. Always follow organizational policies and security best practices.
+MIT License — use and modify freely.
