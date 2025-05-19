@@ -4,7 +4,6 @@
 
 > **🎯 Goal:** Find the maximum number of active SMB sessions an SMB server can handle before rejecting new connections.
 
-
 This project was designed to simulate realistic SMB session behavior — not to saturate bandwidth or stress IOPS. For proper storage benchmarking, use tools like [FIO](https://github.com/axboe/fio).
 
 ---
@@ -23,6 +22,53 @@ python smb_tempest.py --mode_streaming_reads
 >
 > [**example_configs.json**](./smb_tempest_examples_with_comments.json)
 
+> 🔽 **See the [Setup Instructions](#-setup-instructions) section below for full installation details.** 
+
+---
+
+
+## 🗂️ Available Test Modes
+
+Each mode simulates a different I/O profile:
+
+- `--mode_streaming_reads`: Large, sequential reads (e.g. media workloads)
+- `--mode_read_iops`: Small, fast read operations to measure session IOPS
+- `--mode_streaming_writes`: Large, sequential write operations
+- `--mode_random_io`: Random mix of read/write I/O (read ratio configurable)
+
+Example:
+
+```bash
+python smb_tempest.py --mode_streaming_reads --config my_test_config.json
+```
+
+To see all available options:
+
+```bash
+python smb_tempest.py --help
+```
+
+---
+
+## 📁 Example Config Files
+
+Sample JSON configurations are bundled in:
+
+```text
+smb_tempest_examples_with_comments.json
+```
+
+Each config includes a `_comment` key to describe its purpose. For example:
+
+```json
+{
+  "_comment": "Random IOPS test: 90% reads, 10% writes",
+  "smb_server_address": "10.0.2.173",
+  "share_name": "smb-sessions",
+  ...
+}
+```
+
 ---
 
 ## 🧰 Setup Instructions
@@ -40,7 +86,10 @@ If Python’s venv module is missing, the script will prompt you to install it (
 > ```bash
 > source smb_tempest_env/bin/activate
 > ```
-<span style="color:red"><em>⚠️ Important: If you log out or start a new terminal, you’ll need to re-source and run activate again.⚠️</em></span>
+
+> ❗ **Important:** If you log out or start a new terminal, you’ll need to re-run `source smb_tempest_env/bin/activate`.
+
+---
 
 ## 🧪 Preparing a System to Use `smb_tempest.py`
 
@@ -119,7 +168,7 @@ Hi KMacTN! You've successfully authenticated, but GitHub does not provide shell 
 ```
 
 > **FYI:**  
-> 🔐 You probably used an ssh passphrase this one time.   
+> 🔐 You probably used an ssh passphrase this one time.  
 > 🧠 Rare. Wise. Effective.
 
 ---
@@ -143,3 +192,30 @@ remote: Total 116 (delta 60), reused 82 (delta 30), pack-reused 0
 Receiving objects: 100% (116/116), 2.64 MiB | 54.05 MiB/s, done.
 Resolving deltas: 100% (60/60), done.
 ```
+
+---
+
+## 🧠 Understanding the Script
+
+`smb_tempest.py` is a multi-threaded SMB session generator designed to:
+
+- Create N simultaneous SMB client sessions to a target server
+- Launch various I/O patterns (depending on the `--mode` selected)
+- Report on session creation success, errors, throughput, and termination behavior
+
+It supports multiple test modes:
+- `--mode_streaming_reads`
+- `--mode_read_iops`
+- `--mode_streaming_writes`
+- `--mode_random_io`
+
+---
+
+
+## 🧼 Cleaning Up
+
+- Press `Ctrl+C` to stop any running test
+- Check output logs if enabled
+- Monitor system resource usage to determine when SMB session limits are hit
+
+---
