@@ -1,128 +1,48 @@
-# SMB Tempest
+## 📌 Overview
 
-**Author:** KMac and Sheila  
-**Updated:** May 18, 2025
+**smb_tempest.py** is _not_ a load testing or stress benchmarking tool. Its purpose is narrowly focused:
 
-## Overview
+> **🎯 Goal:** Find the maximum number of active SMB sessions an SMB server can handle before rejecting new connections.
 
-`SMB Tempest` is a multi-threaded SMB session generator and load tester.
 
-It connects to an SMB share, creates client-specific directories, writes large files, performs sequential reads, churns random files, and measures performance — all concurrently across many simulated sessions.
+This project was designed to simulate realistic SMB session behavior — not to saturate bandwidth or stress IOPS. For proper storage benchmarking, use tools like [FIO](https://github.com/axboe/fio).
 
-## Key Features
+---
 
-- Multi-threaded SMB I/O stress testing
-- Configurable block size, file size, session count, and I/O mix
-- Rich operational modes (sequential, IOPS, streaming, and mixed)
-- JSON-based config file with CLI override
-- ASCII-friendly summary with throughput and IOPS
-- Designed for scale testing SMB clusters and NAS environments
-
-## Supported Modes
-
-| Mode                  | Description                                                                 |
-|-----------------------|-----------------------------------------------------------------------------|
-| `--mode_streaming_reads`  | Read an existing file sequentially using large blocks (default 1MB)         |
-| `--mode_read_iops`        | Perform many 4KB reads from offset 0 (default: 1024 reads)                  |
-| `--mode_streaming_writes` | Write a large file using large blocks (default 1MB)                         |
-| `--mode_random_io`        | Mix of random reads and writes on an existing file, guided by read percentage |
-
-If **no mode is specified**, the tool defaults to:
-
-> `default (write stream → read stream → churn small random files)`
-
-This mode creates a file, reads it, then rapidly creates and deletes thousands of small files.
-
-## Configuration
-
-You can use a config file (`smb_tempest_cfg.json`) instead of CLI options. If the file exists and no `--config_file` is specified, you'll be prompted to use it.
-
-### Sample Config File
-
-```json
-{
-  "smb_server_address": "10.1.62.40",
-  "share_name": "tempest",
-  "username": "admin",
-  "password": "Admin123!",
-  "num_smb_sessions": 100,
-  "max_file_size": 512,
-  "block_size": 1048576,
-  "mode_read_iops": true,
-  "num_iops_reads": 2048,
-  "fail_fast": true
-}
-```
-
-For `--mode_random_io`, you must also include:
-
-```json
-"max_random_io_readpct": 70
-```
-
-## CLI Usage
+## ⚡ Quick Start
 
 ```bash
-# Run with explicit CLI args
-python smb_tempest.py \
-  --smb_server_address 10.1.62.40 \
-  --share_name tempest \
-  --username admin \
-  --password Admin123! \
-  --num_smb_sessions 125 \
-  --mode_streaming_reads
-
-# OR run using config file (if prompted)
-python smb_tempest.py
+git clone git@github.com:KMacTN/smbgen.git
+cd smbgen
+bash setup_smb_tempest_env.sh
+source smb_tempest_env/bin/activate
+python smb_tempest.py --mode_streaming_reads
 ```
 
-## Output Example
+> 🧪 Example config files for various SMB testing workflows can be found in:
+>
+> [**example_configs.json**](./smb_tempest_examples_with_comments.json)
 
-```
-==================== SMB Tempest Configuration ====================
-Target SMB Server     : 10.0.2.173
-Share Name            : smb-sessions
-Username              : admin
-Block Size            : 1.00 MB
-Max File Size         : 1024 MiB
-Number of Sessions    : 125
-Mode                  : default (write stream → read stream → churn small random files)
-Client UUID Directory : 4cfef4f8-2e23-4cba-8858-846e9fa8995c
-====================================================================
+---
 
-Starting test...
+## 🧰 Setup Instructions
 
-....................................................................
-
-================== Test Summary ==================
-Test Mode(s) Used          : streaming_reads
-Total Tasks Executed       : 125
-Total Random Files Created : 0
-Total Read/IO Volume       : 7.81 GB
-Total Time Taken           : 18.20 seconds
-Max Throughput Achieved    : 429.00 MB/s
-Max IOPS Achieved          : 109,824 IOPS
-==================================================
-✅ SMB Tempest complete.
-```
-
-## Requirements
-
-- Python 3.8+
-- `smbprotocol` library
-- Network access to the SMB server
-
-Install dependencies:
+To prepare your system, run the environment setup script:
 
 ```bash
-pip install smbprotocol
+bash setup_smb_tempest_env.sh
 ```
 
-## License
+If Python’s venv module is missing, the script will prompt you to install it (e.g., `python3.12-venv`).
 
-MIT License — use and modify freely.
+> ✅ Once setup completes, activate the virtual environment:
+>
+> ```bash
+> source smb_tempest_env/bin/activate
+> ```
+<span style="color:red"><em>⚠️ Important: If you log out or start a new terminal, you’ll need to re-source and run activate again.⚠️</em></span>
 
-## 🛠 Preparing a System to Use `smb_tempest.py`
+## 🧪 Preparing a System to Use `smb_tempest.py`
 
 Follow these steps to clone the `smbgen` repository and prepare your system for running `smb_tempest.py`.
 
@@ -130,7 +50,7 @@ Follow these steps to clone the `smbgen` repository and prepare your system for 
 
 ### 1. Clone the Repository
 
-> **Note:** You must be granted access to the repo and have GitHub SSH authentication set up.
+> **🔐 Note:** Access to the private GitHub repo is required. To request access, contact [kmac@qumulo.com](mailto:kmac@qumulo.com).
 
 ---
 
@@ -160,7 +80,7 @@ ls -1 ~/.ssh/github_sshkey_rsa*
 /home/ubuntu/.ssh/github_sshkey_rsa.pub
 ```
 
-> Remember to save the SSH private key (`IdentityFile`) and set file permissions to `0400`.
+> Remember to name the SSH private key to match the `IdentityFile` above, and set the file permissions to `0400`.
 
 ---
 
@@ -173,7 +93,7 @@ eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/github_sshkey_rsa
 ```
 
-You should see:
+You should see something like:
 
 ```
 Agent pid 1607
@@ -198,7 +118,9 @@ Enter passphrase for key '/home/ubuntu/.ssh/github_sshkey_rsa': ****************
 Hi KMacTN! You've successfully authenticated, but GitHub does not provide shell access.
 ```
 
-> *(This is probably the one time you actually used a passphrase.)*
+> **FYI:**  
+> 🔐 You probably used an ssh passphrase this one time.   
+> 🧠 Rare. Wise. Effective.
 
 ---
 
