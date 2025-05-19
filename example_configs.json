@@ -1,0 +1,48 @@
+// example_random_iops_cfg.json
+{
+  "_comment": "Random IOPS test: 90% reads, 10% writes",
+  "smb_server_address": "10.0.2.173",
+  "share_name": "smb-sessions",
+  "username": "admin",
+  "password": "Admin123!",
+  "max_random_io": true,
+  "max_random_io_readpct": 90,
+  "num_smb_sessions": 125,
+  "fail_fast": true
+}
+
+// example_smallops_cfg.json
+{
+  "_comment": "Small Ops test: reads with low latency and high IOPS",
+  "smb_server_address": "10.0.2.173",
+  "share_name": "smb-sessions",
+  "username": "admin",
+  "password": "Admin123!",
+  "hero_read_iops": true,
+  "num_smb_sessions": 125,
+  "fail_fast": true
+}
+
+// example_streaming_smb_tempest_cfg.json
+{
+  "_comment": "Streaming Read test: large-block sequential reads",
+  "smb_server_address": "10.0.2.173",
+  "share_name": "smb-sessions",
+  "username": "admin",
+  "password": "Admin123!",
+  "hero_streaming_reads": true,
+  "num_smb_sessions": 125,
+  "fail_fast": true
+}
+
+// example_streaming_smb_writes_smb_tempest_cfg.json
+{
+  "_comment": "Streaming Write test: large-block sequential writes",
+  "smb_server_address": "10.0.2.173",
+  "share_name": "smb-sessions",
+  "username": "admin",
+  "password": "Admin123!",
+  "hero_streaming_writes": true,
+  "num_smb_sessions": 125,
+  "fail_fast": true
+}

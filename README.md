@@ -121,3 +121,103 @@ pip install smbprotocol
 ## License
 
 MIT License — use and modify freely.
+
+## 🛠 Preparing a System to Use `smb_tempest.py`
+
+Follow these steps to clone the `smbgen` repository and prepare your system for running `smb_tempest.py`.
+
+---
+
+### 1. Clone the Repository
+
+> **Note:** You must be granted access to the repo and have GitHub SSH authentication set up.
+
+---
+
+#### a. Configure Your SSH Agent for GitHub Access
+
+Create or edit your SSH config file:
+
+```bash
+vi ~/.ssh/config
+```
+
+Add the following block:
+
+```ssh
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_sshkey_rsa
+    IdentitiesOnly yes
+```
+
+Ensure the private key exists and has correct permissions:
+
+```bash
+ls -1 ~/.ssh/github_sshkey_rsa*
+/home/ubuntu/.ssh/github_sshkey_rsa
+/home/ubuntu/.ssh/github_sshkey_rsa.pub
+```
+
+> Remember to save the SSH private key (`IdentityFile`) and set file permissions to `0400`.
+
+---
+
+#### b. Add Your SSH Key and Start the Agent
+
+Start the agent and add your key:
+
+```bash
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/github_sshkey_rsa
+```
+
+You should see:
+
+```
+Agent pid 1607
+Enter passphrase for /home/ubuntu/.ssh/github_sshkey_rsa:
+Identity added: /home/ubuntu/.ssh/github_sshkey_rsa (user@kmactn.com)
+```
+
+---
+
+#### c. Test the Connection
+
+You can test your setup by running:
+
+```bash
+ssh -i ~/.ssh/github_sshkey_rsa -T git@github.com
+```
+
+Expected output:
+
+```
+Enter passphrase for key '/home/ubuntu/.ssh/github_sshkey_rsa': ****************
+Hi KMacTN! You've successfully authenticated, but GitHub does not provide shell access.
+```
+
+> *(This is probably the one time you actually used a passphrase.)*
+
+---
+
+#### d. Clone the Repository
+
+Finally, clone the repository:
+
+```bash
+git clone git@github.com:KMacTN/smbgen.git
+```
+
+Expected output:
+
+```
+Cloning into 'smbgen'...
+remote: Enumerating objects: 116, done.
+remote: Counting objects: 100% (116/116), done.
+remote: Compressing objects: 100% (85/85), done.
+remote: Total 116 (delta 60), reused 82 (delta 30), pack-reused 0
+Receiving objects: 100% (116/116), 2.64 MiB | 54.05 MiB/s, done.
+Resolving deltas: 100% (60/60), done.
+```
