@@ -27,9 +27,9 @@ python smb_tempest.py --mode_streaming_reads
 ---
 
 
-## 🗂️ Available Test Modes
+## 🗂️ Available Workload Modes
 
-Each mode simulates a different I/O profile:
+Each mode simulates one of the basic I/O workload profiles:
 
 - `--mode_streaming_reads`: Large, sequential reads (e.g. media workloads)
 - `--mode_read_iops`: Small, fast read operations to measure session IOPS
@@ -168,8 +168,8 @@ Hi KMacTN! You've successfully authenticated, but GitHub does not provide shell 
 ```
 
 > **FYI:**  
-> 🔐 You probably used an ssh passphrase this one time.  
-> 🧠 Rare. Wise. Effective.
+> 🔐 You probably used an actual ssh passphrase this one time.  
+> 🧠 Rare. Wise. Effective. Bravo.
 
 ---
 
